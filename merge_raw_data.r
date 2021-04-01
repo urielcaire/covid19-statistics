@@ -73,7 +73,7 @@ covid19 <- merge(covid19, corruption_perception, by = "location")
 covid19 <- merge(covid19, alcohol_consumption, by = "location")
 
 # Saving the merged dataframe as a .csv file
-write.csv(covid19, paste(home, '/data/datasets/merged-data.csv', sep=''),
-          row.names = FALSE)
+write.table(covid19, paste(home, '/data/datasets/merged-data.csv', sep=''),
+          sep = ',', row.names = FALSE, quote=FALSE)
 
 #View(covid19)
