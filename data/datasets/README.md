@@ -30,3 +30,13 @@ Below are all the data sets used by this project:
 - Link: https://ourworldindata.org/alcohol-consumption
 
 - Citation: Hannah Ritchie and Max Roser (2018) - "Alcohol Consumption". Published online at OurWorldInData.org. Retrieved from: 'https://ourworldindata.org/alcohol-consumption' [Online Resource]
+
+# Merged Data
+In order to simplify our analysis, we merged all this data together into `merged-data.csv`. To do so, we first classified our datasets into two groups:  
+
+- **Main data**: `owid-covid-data.csv`;
+- **Complementary data**: `child-mortality-igme.csv`, `economic-inequality-gini-index.csv`, `share-of-population-urban.csv`, `TI-corruption-perception-index.csv` and `total-alcohol-consumption-per-capita-litres-of-pure-alcohol.csv`.
+
+## Merge Processes
+All **complementary data sets** contain 4 columns (features): `Entity, Code, Year, X`, where `X` is the value related to the objective of the data set (e.g., child mortality rate). Therefore, we applied the same processes on them.  
+First we renamed column `Entity` to `location`; then, through `Year`, we selected just the most recent data per location; next, we removed the columns `Code` and `Year`; and finally, we joined all with **Main data** by using column `location`.
