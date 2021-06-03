@@ -86,3 +86,7 @@ shapiro.test(res_model$residuals)
 # Check stationarity: stationarity, p-value = 0.04796
 stat_test <- Box.test(diff_new_deaths, type = 'Ljung-Box')
 stat_test
+
+# Try stlf, but
+# series is not periodic or has less than two periods =(
+stlf_result <- stlf(diff_new_deaths, h=length(diff_new_deaths))
