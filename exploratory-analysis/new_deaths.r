@@ -11,8 +11,8 @@ covid19 <- read.csv(covid19)
 covid19 <- covid19[order(as.numeric(as.Date(covid19$date, format = "%Y-%m-%d"))),]
 
 
-# Getting first date of 'new_deaths' report
-day_zero <- first(covid19[covid19$new_deaths>0, 'date'])
+# Getting first date of reports
+day_zero <- first(covid19[, 'date'])
 # Getting the initial year
 start_year <- as.numeric(strftime(as.Date(day_zero), format = '%Y'))
 start_year
