@@ -83,3 +83,6 @@ hist(res_model$residuals)
 checkresiduals(res_model)
 # Check distribution: seems to be a normal distribution
 shapiro.test(res_model$residuals)
+# Check stationarity: stationarity, p-value = 0.04796
+stat_test <- Box.test(diff_new_deaths, type = 'Ljung-Box')
+stat_test
