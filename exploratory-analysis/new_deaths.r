@@ -2,6 +2,8 @@ library(forecast)
 library(ggplot2)
 require(data.table)
 library(comprehenr)
+require(tseries)
+
 home <- getwd()
 
 covid19 <- paste(home, '/data/datasets/covid-brazil-2021-05-22.csv', sep='')
@@ -13,16 +15,16 @@ covid19 <- covid19[order(as.numeric(as.Date(covid19$date, format = "%Y-%m-%d")))
 
 # Getting first date of reports
 day_zero <- first(covid19[, 'date'])
-# Getting the initial year
-start_year <- as.numeric(strftime(as.Date(day_zero), format = '%Y'))
-start_year
-# Getting initial day position in year range (1:366)
-firstDay_ofYear <- as.numeric(strftime(as.Date(day_zero), format = '%j'))
-firstDay_ofYear
+# Getting the initial week
+start_week <- as.numeric(strftime(as.Date(day_zero), format = '%U'))
+start_week
+# Getting initial day position in week range (1:7)
+start_day <- as.numeric(strftime(as.Date(day_zero), format = '%w')) + 1
+start_day
 
-# Transforms data into daily frequency TimeSeries with a yearly period
-new_deaths <- ts(covid19[,c('new_deaths')], start = c(start_year, firstDay_ofYear),
-                 frequency = 365)
+# Transforms data into daily frequency TimeSeries with a weekly period
+new_deaths <- ts(covid19[,c('new_deaths')], start = c(start_week, start_day),
+                 frequency = 7)
 
 # Print some infos about new_deaths
 summary(new_deaths)
@@ -32,19 +34,23 @@ autoplot(new_deaths)
 hist(new_deaths)
 # Plot a box plot
 boxplot(new_deaths)
+# Plot season
+seasonplot(new_deaths)
 
 # Residual analysis
 res_model <- auto.arima(new_deaths)
 autoplot(res_model$residuals)
 hist(res_model$residuals)
-# Check residuals: correlated
+# Check residuals: seems to be not correlated, p-value = 0.007076
+# correlation table
 checkresiduals(res_model)
-# Check distribution: it is not a normal distribution
+# Check distribution: not normal, p-value < 2.2e-16
+# https://rpubs.com/paternogbc/46768
 shapiro.test(res_model$residuals)
+# Check stationarity: not stationarity, p-value = 0.9216
+adf_test <- adf.test(new_deaths,alternative = 'stationary')
+print(adf_test)
 
-# Check stationarity: not stationarity, p-value < 2.2e-16.
-stat_test <- Box.test(new_deaths, type = 'Ljung-Box')
-stat_test
 # Check ndiffs
 ndiffs(new_deaths, test = 'kpss')
 
@@ -79,14 +85,17 @@ plot(diff_new_deaths, main='diff_new_deaths')
 res_model <- auto.arima(diff_new_deaths)
 autoplot(res_model$residuals)
 hist(res_model$residuals)
-# Check residuals: not correlated
+# Check residuals: has a weak correlation,p-value = 0.3915
 checkresiduals(res_model)
-# Check distribution: seems to be a normal distribution
+# Check distribution: it is not a normal distribution, p-value = 0.02332
 shapiro.test(res_model$residuals)
-# Check stationarity: stationarity, p-value = 0.04796
-stat_test <- Box.test(diff_new_deaths, type = 'Ljung-Box')
-stat_test
+# Check stationarity: seems stationarity, p-value = 0.08105
+adf_test <- adf.test(diff_new_deaths,alternative = 'stationary')
+print(adf_test)
 
-# Try stlf, but
-# series is not periodic or has less than two periods =(
-stlf_result <- stlf(diff_new_deaths, h=length(diff_new_deaths))
+# Apply stlf decomposition
+stlf_result <- stlf(diff_new_deaths, h=7)
+autoplot(stlf_result)
+seasonplot(diff_new_deaths)
+
+# TODO: reduce outliers with moving average ()
