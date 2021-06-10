@@ -38,7 +38,7 @@ boxplot(new_deaths)
 seasonplot(new_deaths)
 
 # Residual analysis
-res_model <- auto.arima(new_deaths)
+res_model <- auto.arima(tsclean(new_deaths))
 autoplot(res_model$residuals)
 hist(res_model$residuals)
 # Check residuals: seems to be not correlated, p-value = 0.007076
@@ -51,6 +51,14 @@ shapiro.test(res_model$residuals)
 adf_test <- adf.test(new_deaths,alternative = 'stationary')
 print(adf_test)
 
+# Moving Averages: removes outliers and smooth graph
+plot(new_deaths)
+lines(ma(new_deaths, order=5), col='red')
+# tsclean: it was better for outliers
+plot(new_deaths)
+lines(tsclean(new_deaths), col='green')
+new_deaths <- tsclean(new_deaths)
+
 # Check ndiffs
 ndiffs(new_deaths, test = 'kpss')
 
@@ -58,7 +66,7 @@ ndiffs(new_deaths, test = 'kpss')
 alpha <- 0.05
 best_p_value <- 2
 best_param_diff <- 1
-for(i in 1:450){
+for(i in 1:431){
   diff_new_deaths <- diff(new_deaths, i)
   diff_stat_test <- Box.test(diff_new_deaths, type = 'Ljung-Box')
   # absolute
@@ -98,4 +106,3 @@ stlf_result <- stlf(diff_new_deaths, h=7)
 autoplot(stlf_result)
 seasonplot(diff_new_deaths)
 
-# TODO: reduce outliers with moving average ()
