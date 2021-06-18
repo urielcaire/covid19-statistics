@@ -76,5 +76,28 @@ ggAcf(new_deaths)
 #so it is not an "white noise"
 
 # Plot TS seasonality infos(data, seasonal, trend, remainder)
+#seasonal component does not change over time: we should use additive decomposition
+#yt=St+Tt+Rt
 #https://otexts.com/fpp2/components.html
 plot(stl(new_deaths, "periodic"))
+
+# Apply decomposition and Plot TS infos(data, seasonal, trend, remainder)
+#STL will handle any type of seasonality
+#t.window is the number of consecutive observations to be used when estimating the
+#trend-cycle
+#seasonal component does not change over time: we should use additive decomposition
+#https://otexts.com/fpp2/stl.html
+new_deaths %>%
+  stl(t.window=28, s.window="periodic", robust=TRUE) %>%
+  autoplot()
+#getting decomposed values
+decomposed_ts <- stl(new_deaths, t.window=28, s.window="periodic", robust=TRUE)
+new_deaths_season <- decomposed_ts$time.series[,1]
+new_deaths_trend  <- decomposed_ts$time.series[,2]
+new_deaths_random <- decomposed_ts$time.series[,3]
+
+# TO DO:
+# Measuring strength of trend and seasonality
+#https://otexts.com/fpp2/seasonal-strength.html
+#max(0.1 - (var(new_deaths_random/(var(new_deaths_trend+new_deaths_random)))))
+#max(0.1 - (var(new_deaths_random/(var(new_deaths_season+new_deaths_random)))))
