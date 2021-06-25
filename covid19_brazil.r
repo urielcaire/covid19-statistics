@@ -4,6 +4,10 @@ library(naniar)
 require(data.table)
 home <- getwd()
 
+################################################################################
+# PreExploratory Analysis
+################################################################################
+
 # Load the main dataset as a dataframe
 covid19 <- paste(home, '/data/datasets/owid-covid-data-2021-05-22.csv', sep='')
 covid19 <- read.csv(covid19)
