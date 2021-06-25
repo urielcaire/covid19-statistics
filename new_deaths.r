@@ -29,6 +29,10 @@ new_deaths <- ts(covid19[,c('new_deaths')], start = c(start_week, start_day),
                  frequency = 7)
 new_deaths
 
+################################################################################
+# Exploratory Analysis
+################################################################################
+
 # Print some infos about new_deaths
 summary(new_deaths)
 # Plot it (we can observer a seasonality and "changing direction")
@@ -96,8 +100,16 @@ new_deaths_season <- decomposed_ts$time.series[,1]
 new_deaths_trend  <- decomposed_ts$time.series[,2]
 new_deaths_random <- decomposed_ts$time.series[,3]
 
+# Saving the dataframe as a .csv file
+#write.table(new_deaths, paste(home, '/data/datasets/new_deaths.csv', sep=''),
+#sep = ',', row.names = FALSE, quote=FALSE)
+
 # TO DO:
 # Measuring strength of trend and seasonality
 #https://otexts.com/fpp2/seasonal-strength.html
 #max(0.1 - (var(new_deaths_random/(var(new_deaths_trend+new_deaths_random)))))
 #max(0.1 - (var(new_deaths_random/(var(new_deaths_season+new_deaths_random)))))
+
+################################################################################
+# FORECAST
+################################################################################
