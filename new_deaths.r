@@ -92,10 +92,10 @@ plot(stl(new_deaths, "periodic"))
 #seasonal component does not change over time: we should use additive decomposition
 #https://otexts.com/fpp2/stl.html
 new_deaths %>%
-  stl(t.window=28, s.window="periodic", robust=TRUE) %>%
+  stl(t.window=21, s.window="periodic", robust=TRUE) %>%
   autoplot()
 #getting decomposed values
-decomposed_ts <- stl(new_deaths, t.window=28, s.window="periodic", robust=TRUE)
+decomposed_ts <- stl(new_deaths, t.window=21, s.window="periodic", robust=TRUE)
 new_deaths_season <- decomposed_ts$time.series[,1]
 new_deaths_trend  <- decomposed_ts$time.series[,2]
 new_deaths_random <- decomposed_ts$time.series[,3]
@@ -111,5 +111,27 @@ new_deaths_random <- decomposed_ts$time.series[,3]
 #max(0.1 - (var(new_deaths_random/(var(new_deaths_season+new_deaths_random)))))
 
 ################################################################################
-# FORECAST
+# Preprocessing 
 ################################################################################
+# Replace zeros with 14-day average deaths
+0 %in% new_deaths # TRUE
+length(new_deaths)
+new_deaths_p <- new_deaths
+for(i in 1:length(new_deaths_p)) {
+  if(new_deaths_p[i]==0){
+    past <- sum(new_deaths_p[(i-7):(i-1)])
+    post <- sum(new_deaths_p[(i+1):(i+7)])
+    new_deaths_p[i] <- as.integer((past + post)/14)
+  }
+}
+0 %in% new_deaths_p # FALSE
+
+# Apply decomposition and Plot TS infos(data, seasonal, trend, remainder)
+new_deaths_p %>%
+  stl(t.window=21, s.window="periodic", robust=TRUE) %>%
+  autoplot()
+#getting decomposed values
+decomposed_ts_p <- stl(new_deaths_p, t.window=21, s.window="periodic", robust=TRUE)
+new_deaths_season_p <- decomposed_ts_p$time.series[,1]
+new_deaths_trend_p  <- decomposed_ts_p$time.series[,2]
+new_deaths_random_p <- decomposed_ts_p$time.series[,3]
