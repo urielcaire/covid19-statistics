@@ -135,3 +135,45 @@ decomposed_ts_p <- stl(new_deaths_p, t.window=21, s.window="periodic", robust=TR
 new_deaths_season_p <- decomposed_ts_p$time.series[,1]
 new_deaths_trend_p  <- decomposed_ts_p$time.series[,2]
 new_deaths_random_p <- decomposed_ts_p$time.series[,3]
+
+################################################################################
+# FORECASTING
+################################################################################
+# USING STL DECOMPOSITION
+#https://otexts.com/fpp2/forecasting-decomposition.html
+# Naïve forecasts of the seasonally adjusted data from an STL decomposition
+naive_model <- stl(subset(new_deaths_p,end=length(new_deaths)-14), t.window=21,
+                   s.window="periodic", robust=TRUE)
+naive_model %>% seasadj() %>% naive() %>%
+  autoplot() + ylab("New orders index") +
+  ggtitle("Naive forecasts of seasonally adjusted data")
+
+# Adding the seasonal naïve forecasts of the seasonal component
+naive_model %>% forecast(method="naive") %>%
+  autoplot() + ylab("Número de Óbitos") + xlab('Semana') +
+  ggtitle("Previsão (forecast) usando STL + Passeio Aleatório (Random Walk)")
+
+# Forecast from STL using ETS method
+ets_model <- stlf(new_deaths_p, t.window=21, s.window="periodic", robust=TRUE)
+autoplot(ets_model) + ylab("Número de Óbitos") + xlab('Semana')
+
+
+################################################################################
+# Exponential Smoothing
+#This method is suitable for data with no clear trend or seasonal pattern
+#Our data have a seosonal pattern, but the trend changes direction
+#"Forecasts are calculated using weighted averages, where the weights decrease 
+#exponentially as observations come from further in the past"
+#https://otexts.com/fpp2/ses.html
+
+#Holt-Winters method
+#"The Holt-Winters method can be used for daily type of data, where the
+#seasonal period is 7"
+#https://otexts.com/fpp2/holt-winters.html#example-holt-winters-method-with-daily-data
+#https://otexts.com/fpp2/taxonomy.html
+holtw_model <- hw(subset(new_deaths_p,end=length(new_deaths)-14),
+         damped = TRUE, seasonal="additive", h=21)
+autoplot(new_deaths_p) + ylab("Número de Óbitos") +
+  ggtitle("Previsão de Óbitos por Covid-19") +
+  autolayer(holtw_model, series="Método Holt-Winters aditivo", PI=FALSE)+
+  guides(colour=guide_legend(title="Previsão"))
