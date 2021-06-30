@@ -2,6 +2,7 @@ library(forecast)
 library(ggplot2)
 require(data.table)
 library(comprehenr)
+library(urca)
 require(tseries)
 
 home <- getwd()
@@ -78,6 +79,7 @@ ggAcf(new_deaths)
 
 # "Time series that show no autocorrelation are called white noise."
 #so it is not an "white noise"
+#https://otexts.com/fpp2/wn.html
 
 # Plot TS seasonality infos(data, seasonal, trend, remainder)
 #seasonal component does not change over time: we should use additive decomposition
@@ -173,7 +175,64 @@ autoplot(ets_model) + ylab("Número de Óbitos") + xlab('Semana')
 #https://otexts.com/fpp2/taxonomy.html
 holtw_model <- hw(subset(new_deaths_p,end=length(new_deaths)-14),
          damped = TRUE, seasonal="additive", h=21)
-autoplot(new_deaths_p) + ylab("Número de Óbitos") +
+autoplot(new_deaths_p) + ylab("Número de Óbitos") + xlab('Semana') +
   ggtitle("Previsão de Óbitos por Covid-19") +
   autolayer(holtw_model, series="Método Holt-Winters aditivo", PI=FALSE)+
   guides(colour=guide_legend(title="Previsão"))
+
+################################################################################
+# ARIMA
+
+#Unit Root test
+#"(...) to determine more objectively whether differencing is required or not."
+#"In this test, the null hypothesis is that the data are stationary. So
+#small p-values (e.g., less than 0.05) suggest that differencing is required"
+#https://otexts.com/fpp2/stationarity.html#unit-root-tests
+new_deaths_p %>% ur.kpss() %>% summary() # p-value: 3.8086; not stationary.
+#aply diff and test again
+diff(new_deaths_p) %>% ur.kpss() %>% summary() # p-value: 0.0221; stationary.
+#determining whether seasonal differencing is required
+nsdiffs(new_deaths_p)# returned 1; so it is required too.
+diff(diff(new_deaths_p),7) %>% ur.kpss() %>% summary()
+#get diff data
+diff_new_deaths_p <- diff(diff(new_deaths_p),7)
+autoplot(diff_new_deaths_p) + xlab('Semana')
+
+#Non-Seasonal Arima Model
+#R uses maximum likelihood estimation (MLE) to estimate ARIMA models
+#https://otexts.com/fpp2/arima-estimation.html
+ns_arima_model <- auto.arima(diff_new_deaths_p, seasonal=FALSE, stepwise=FALSE,
+                             approximation = FALSE)
+ns_arima_model
+
+ns_arima_model %>% forecast(h=7) %>% autoplot(include=30)
+
+#There are a few significant spikes in the ACF, and the model fails the Ljung-Box test. 
+#The model can still be used for forecasting, but the prediction intervals may not be
+#accurate due to the correlated residuals.
+checkresiduals(ns_arima_model) # Q* = 65.155, df = 9, p-value = 1.346e-10 = 0.0000000001346
+
+#The prediction intervals for ARIMA models are based on assumptions that the
+#residuals are uncorrelated and normally distributed. If either of these assumptions
+#does not hold, then the prediction intervals may be incorrect. For this reason,
+#always plot the ACF and histogram of the residuals to check the assumptions before
+#producing prediction intervals.
+hist(ns_arima_model$residuals)
+
+#Seasonal Arima Model
+sea_arima_model <- auto.arima(new_deaths_p, seasonal=TRUE, stepwise=FALSE,
+                              approximation = FALSE)
+sea_arima_model
+
+sea_arima_model %>% forecast(h=7) %>% autoplot(include=100)
+
+checkresiduals(sea_arima_model)
+
+#ALL autocorrelations values are within the threshold limits, indicating that the
+#residuals are behaving like WHITE NOISE
+ggAcf(sea_arima_model$residuals)
+
+hist(ns_arima_model$residuals)
+
+# TO DO:
+# ARIVA VS ETS https://otexts.com/fpp2/arima-ets.html
