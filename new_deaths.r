@@ -46,7 +46,7 @@ hist(new_deaths)
 boxplot(new_deaths)
 
 # Plot season
-#it shows a frequent jump on sundays to 2020 and 2021, and on weednesdays to 2021
+#it shows a
 #number of deaths increases around week 58ª
 #https://otexts.com/fpp2/seasonal-plots.html
 ggseasonplot(new_deaths, season.labels = c("Dom","Seg","Ter","Qua","Qui","Sex","Sab"),
@@ -71,7 +71,7 @@ ggsubseriesplot(new_deaths, labels = c("Dom","Seg","Ter","Qua","Qui","Sex","Sab"
 gglagplot(new_deaths, 16, do.lines = FALSE)
 
 # Plot correlogram
-#autocorrelation larger for lags multiples of 7, indicating seasonality
+#autocorrelation larger for lags multiples of 7, again indicating seasonality
 #there is a decrease in the ACF as the lags increase, indicating a trend
 #https://otexts.com/fpp2/autocorrelation.html
 #https://rpubs.com/hudsonchavs/fac_facp#:~:text=FUN%C3%87%C3%83O%20DE%20AUTOCORRELA%C3%87%C3%83O&text=onde%20Var(r,rt%20%C3%A9%20fracamente%20estacion%C3%A1rio.
@@ -138,6 +138,40 @@ new_deaths_season_p <- decomposed_ts_p$time.series[,1]
 new_deaths_trend_p  <- decomposed_ts_p$time.series[,2]
 new_deaths_random_p <- decomposed_ts_p$time.series[,3]
 
+# TO DO:
+# Mathematical transformations: to apply log
+# "(...) If the data show variation that increases or decreases with the level of
+# the series, then a transformation can be useful"
+#https://otexts.com/fpp2/transformations.html#mathematical-transformations
+(lambda <- BoxCox.lambda(new_deaths_p))
+autoplot(BoxCox(new_deaths_p,lambda))
+
+################################################################################
+# FORECASTING (Simple Methods)
+################################################################################
+
+# Average method
+#https://otexts.com/fpp2/simple-methods.html#average-method
+meanf_model <- meanf(new_deaths_p, h=7)
+# Seasonal naïve method
+#https://otexts.com/fpp2/simple-methods.html#seasonal-na%C3%AFve-method
+snaive_model <- snaive(new_deaths_p, drift=FALSE, h=7)
+# Seasonal naive drift method
+#https://otexts.com/fpp2/simple-methods.html#drift-method
+naive_drift_model <- rwf(new_deaths_p, h=7, drift=TRUE)
+
+autoplot(window(new_deaths_p, start=c(60,1))) +
+  autolayer(meanf_model,
+    series="Mean", PI=FALSE) +
+  autolayer(snaive_model,
+    series="Seasonal Naïve", PI=FALSE) +
+  autolayer(naive_drift_model,
+    series="Naïve Drift", PI=FALSE) +
+  ggtitle("COVID-19 Simple methods forecasting") +
+  xlab("Semana") + ylab("Número de Óbitos") +
+  guides(colour=guide_legend(title="Forecast"))
+
+
 ################################################################################
 # FORECASTING
 ################################################################################
@@ -157,7 +191,7 @@ naive_model %>% forecast(method="naive") %>%
 
 # Forecast from STL using ETS method
 ets_model <- stlf(new_deaths_p, t.window=21, s.window="periodic", robust=TRUE)
-autoplot(ets_model) + ylab("Número de Óbitos") + xlab('Semana')
+autoplot(ets_model, include = 70) + ylab("Número de Óbitos") + xlab('Semana')
 
 
 ################################################################################
@@ -175,7 +209,7 @@ autoplot(ets_model) + ylab("Número de Óbitos") + xlab('Semana')
 #https://otexts.com/fpp2/taxonomy.html
 holtw_model <- hw(subset(new_deaths_p,end=length(new_deaths)-14),
          damped = TRUE, seasonal="additive", h=21)
-autoplot(new_deaths_p) + ylab("Número de Óbitos") + xlab('Semana') +
+autoplot(window(new_deaths_p, start=c(60,1))) + ylab("Número de Óbitos") + xlab('Semana') +
   ggtitle("Previsão de Óbitos por Covid-19") +
   autolayer(holtw_model, series="Método Holt-Winters aditivo", PI=FALSE)+
   guides(colour=guide_legend(title="Previsão"))
@@ -188,6 +222,7 @@ autoplot(new_deaths_p) + ylab("Número de Óbitos") + xlab('Semana') +
 #"In this test, the null hypothesis is that the data are stationary. So
 #small p-values (e.g., less than 0.05) suggest that differencing is required"
 #https://otexts.com/fpp2/stationarity.html#unit-root-tests
+# kpss.test() also useful
 new_deaths_p %>% ur.kpss() %>% summary() # p-value: 3.8086; not stationary.
 #aply diff and test again
 diff(new_deaths_p) %>% ur.kpss() %>% summary() # p-value: 0.0221; stationary.
@@ -205,7 +240,7 @@ ns_arima_model <- auto.arima(diff_new_deaths_p, seasonal=FALSE, stepwise=FALSE,
                              approximation = FALSE)
 ns_arima_model
 
-ns_arima_model %>% forecast(h=7) %>% autoplot(include=30)
+ns_arima_model %>% forecast(h=7) %>% autoplot(include=100)
 
 #There are a few significant spikes in the ACF, and the model fails the Ljung-Box test. 
 #The model can still be used for forecasting, but the prediction intervals may not be
@@ -236,3 +271,37 @@ hist(ns_arima_model$residuals)
 
 # TO DO:
 # ARIVA VS ETS https://otexts.com/fpp2/arima-ets.html
+
+################################################################################
+# Neural network models
+#https://otexts.com/fpp2/nnetar.html
+
+neural_model <- nnetar(new_deaths_p)
+neural_model
+
+autoplot(forecast(neural_model,h=7,PI=TRUE), include = 100)
+
+################################################################################
+# MODELS ANALYSIS
+################################################################################
+# Residuals
+# 1.The residuals should to be uncorrelated
+# 2.The residuals should to have zero mean
+# and it is useful (but not necessary):
+# 3.The residuals have constant variance.
+# 4.The residuals are normally distributed.
+#https://otexts.com/fpp2/residuals.html#residuals-1
+checkresiduals(meanf_model)
+checkresiduals(snaive_model)
+checkresiduals(naive_drift_model)
+
+checkresiduals(ets_model)
+
+checkresiduals(holtw_model)
+
+checkresiduals(ns_arima_model)
+checkresiduals(sea_arima_model)
+
+# we should use portmanteau test to check if it is really autocorrelated
+checkresiduals(neural_model)
+Box.test(neural_model$residuals,lag=14,type="Lj")# 
