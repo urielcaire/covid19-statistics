@@ -4,10 +4,11 @@ require(data.table)
 library(comprehenr)
 library(urca)
 require(tseries)
+set.seed(99);
 
 home <- getwd()
 
-covid19 <- paste(home, '/data/datasets/covid-brazil-2021-05-22.csv', sep='')
+covid19 <- paste(home, '/data/datasets/covid-brazil-2021-07-01.csv', sep='')
 covid19 <- read.csv(covid19)
 
 # Sort the data by date
@@ -28,7 +29,9 @@ start_day
 #https://otexts.com/fpp2/tspatterns.html
 new_deaths <- ts(covid19[,c('new_deaths')], start = c(start_week, start_day),
                  frequency = 7)
-new_deaths
+
+new_deaths_test <- window(new_deaths, start=c(73,1), end=c(74,7))
+new_deaths <- window(new_deaths, end=c(72,7))
 
 ################################################################################
 # Exploratory Analysis
@@ -116,6 +119,7 @@ new_deaths_random <- decomposed_ts$time.series[,3]
 # Preprocessing 
 ################################################################################
 # Replace zeros with 14-day average deaths
+0 %in% new_deaths_test # FALSE
 0 %in% new_deaths # TRUE
 length(new_deaths)
 new_deaths_p <- new_deaths
@@ -127,6 +131,12 @@ for(i in 1:length(new_deaths_p)) {
   }
 }
 0 %in% new_deaths_p # FALSE
+
+# tsclean: it was better for outliers
+# plot(new_deaths_p)
+# lines(tsclean(new_deaths_p), col='purple')
+#new_deaths_p <- tsclean(new_deaths_p)
+
 
 # Apply decomposition and Plot TS infos(data, seasonal, trend, remainder)
 new_deaths_p %>%
@@ -146,21 +156,26 @@ new_deaths_random_p <- decomposed_ts_p$time.series[,3]
 (lambda <- BoxCox.lambda(new_deaths_p))
 autoplot(BoxCox(new_deaths_p,lambda))
 
+# Spliting data in TRAIN and TEST
+new_deaths_train <- new_deaths_p
+autoplot(new_deaths_train, series="Dados de Treino", color='black') + autolayer(
+  new_deaths_test, series="Dados de Teste", color='green')
+
 ################################################################################
 # FORECASTING (Simple Methods)
 ################################################################################
 
 # Average method
 #https://otexts.com/fpp2/simple-methods.html#average-method
-meanf_model <- meanf(new_deaths_p, h=7)
+meanf_model <- meanf(new_deaths_train, h=7)
 # Seasonal naïve method
 #https://otexts.com/fpp2/simple-methods.html#seasonal-na%C3%AFve-method
-snaive_model <- snaive(new_deaths_p, drift=FALSE, h=7)
+snaive_model <- snaive(new_deaths_train, drift=FALSE, h=7)
 # Seasonal naive drift method
 #https://otexts.com/fpp2/simple-methods.html#drift-method
-naive_drift_model <- rwf(new_deaths_p, h=7, drift=TRUE)
+naive_drift_model <- rwf(new_deaths_train, h=7, drift=TRUE)
 
-autoplot(window(new_deaths_p, start=c(60,1))) +
+autoplot(window(new_deaths_train, start=c(60,1))) +
   autolayer(meanf_model,
     series="Mean", PI=FALSE) +
   autolayer(snaive_model,
@@ -178,7 +193,7 @@ autoplot(window(new_deaths_p, start=c(60,1))) +
 # USING STL DECOMPOSITION
 #https://otexts.com/fpp2/forecasting-decomposition.html
 # Naïve forecasts of the seasonally adjusted data from an STL decomposition
-naive_model <- stl(subset(new_deaths_p,end=length(new_deaths)-14), t.window=21,
+naive_model <- stl(new_deaths_train, t.window=21,
                    s.window="periodic", robust=TRUE)
 naive_model %>% seasadj() %>% naive() %>%
   autoplot() + ylab("New orders index") +
@@ -190,7 +205,7 @@ naive_model %>% forecast(method="naive") %>%
   ggtitle("Previsão (forecast) usando STL + Passeio Aleatório (Random Walk)")
 
 # Forecast from STL using ETS method
-ets_model <- stlf(new_deaths_p, t.window=21, s.window="periodic", robust=TRUE)
+ets_model <- stlf(new_deaths_train, t.window=21, s.window="periodic", robust=TRUE)
 autoplot(ets_model, include = 70) + ylab("Número de Óbitos") + xlab('Semana')
 
 
@@ -207,9 +222,9 @@ autoplot(ets_model, include = 70) + ylab("Número de Óbitos") + xlab('Semana')
 #seasonal period is 7"
 #https://otexts.com/fpp2/holt-winters.html#example-holt-winters-method-with-daily-data
 #https://otexts.com/fpp2/taxonomy.html
-holtw_model <- hw(subset(new_deaths_p,end=length(new_deaths)-14),
+holtw_model <- hw(new_deaths_train,
          damped = TRUE, seasonal="additive", h=21)
-autoplot(window(new_deaths_p, start=c(60,1))) + ylab("Número de Óbitos") + xlab('Semana') +
+autoplot(window(new_deaths_train, start=c(60,1))) + ylab("Número de Óbitos") + xlab('Semana') +
   ggtitle("Previsão de Óbitos por Covid-19") +
   autolayer(holtw_model, series="Método Holt-Winters aditivo", PI=FALSE)+
   guides(colour=guide_legend(title="Previsão"))
@@ -223,20 +238,20 @@ autoplot(window(new_deaths_p, start=c(60,1))) + ylab("Número de Óbitos") + xla
 #small p-values (e.g., less than 0.05) suggest that differencing is required"
 #https://otexts.com/fpp2/stationarity.html#unit-root-tests
 # kpss.test() also useful
-new_deaths_p %>% ur.kpss() %>% summary() # p-value: 3.8086; not stationary.
+new_deaths_train %>% ur.kpss() %>% summary() # p-value: 3.2307; not stationary.
 #aply diff and test again
-diff(new_deaths_p) %>% ur.kpss() %>% summary() # p-value: 0.0221; stationary.
+diff(new_deaths_train) %>% ur.kpss() %>% summary() # p-value: 0.0357; stationary.
 #determining whether seasonal differencing is required
-nsdiffs(new_deaths_p)# returned 1; so it is required too.
-diff(diff(new_deaths_p),7) %>% ur.kpss() %>% summary()
+nsdiffs(new_deaths_train)# returned 1; so it is required too.
+diff(diff(new_deaths_train),7) %>% ur.kpss() %>% summary()
 #get diff data
-diff_new_deaths_p <- diff(diff(new_deaths_p),7)
-autoplot(diff_new_deaths_p) + xlab('Semana')
+diff_new_deaths_train <- diff(diff(new_deaths_train),7)
+autoplot(diff_new_deaths_train) + xlab('Semana')
 
 #Non-Seasonal Arima Model
 #R uses maximum likelihood estimation (MLE) to estimate ARIMA models
 #https://otexts.com/fpp2/arima-estimation.html
-ns_arima_model <- auto.arima(diff_new_deaths_p, seasonal=FALSE, stepwise=FALSE,
+ns_arima_model <- auto.arima(diff_new_deaths_train, seasonal=FALSE, stepwise=FALSE,
                              approximation = FALSE)
 ns_arima_model
 
@@ -255,7 +270,7 @@ checkresiduals(ns_arima_model) # Q* = 65.155, df = 9, p-value = 1.346e-10 = 0.00
 hist(ns_arima_model$residuals)
 
 #Seasonal Arima Model
-sea_arima_model <- auto.arima(new_deaths_p, seasonal=TRUE, stepwise=FALSE,
+sea_arima_model <- auto.arima(new_deaths_train, seasonal=TRUE, stepwise=FALSE,
                               approximation = FALSE)
 sea_arima_model
 
@@ -270,13 +285,13 @@ ggAcf(sea_arima_model$residuals)
 hist(ns_arima_model$residuals)
 
 # TO DO:
-# ARIVA VS ETS https://otexts.com/fpp2/arima-ets.html
+# ARIMA VS ETS https://otexts.com/fpp2/arima-ets.html
 
 ################################################################################
 # Neural network models
 #https://otexts.com/fpp2/nnetar.html
 
-neural_model <- nnetar(new_deaths_p)
+neural_model <- nnetar(new_deaths_train)
 neural_model
 
 autoplot(forecast(neural_model,h=7,PI=TRUE), include = 100)
@@ -300,8 +315,57 @@ checkresiduals(ets_model)
 checkresiduals(holtw_model)
 
 checkresiduals(ns_arima_model)
+Box.test(ns_arima_model$residuals,lag=14,type="Lj")# 
 checkresiduals(sea_arima_model)
+Box.test(sea_arima_model$residuals,lag=14,type="Lj")#
 
 # we should use portmanteau test to check if it is really autocorrelated
 checkresiduals(neural_model)
 Box.test(neural_model$residuals,lag=14,type="Lj")# 
+
+################################################################################
+# FORECAST ANALYSIS
+################################################################################
+# Showing simple models forecasts
+#only naive seasonal seems to make sense
+autoplot(window(new_deaths, start=c(60,1))) +
+  autolayer(meanf_model, series="MEAN", PI=FALSE) +
+  autolayer(snaive_model, series="Naive Sasonal", PI=FALSE) +
+  autolayer(naive_drift_model, series="Naive Drift", PI=FALSE) +
+  xlab("Semana") + ylab("Óbitos por Covid-19") +
+  ggtitle("Previsão de óbitos por Covid-19") +
+  guides(colour=guide_legend(title="Forecast"))
+
+# Showing ARIMA and Neural Network models
+#here we'll discard the Non-Seasonal ARIMA
+autoplot(window(new_deaths, start=c(60,1))) +
+  autolayer(forecast(ns_arima_model, h=7), series="ARIMA Não Sasonal", PI=FALSE) +
+  autolayer(forecast(sea_arima_model,h=7), series="ARIMA Sasonal", PI=FALSE) +
+  autolayer(forecast(neural_model, h=7), series="Rede Neural", PI=FALSE) +
+  xlab("Semana") + ylab("Óbitos por Covid-19") +
+  ggtitle("Previsão de óbitos por Covid-19") +
+  guides(colour=guide_legend(title="Forecast"))
+
+# Showing remaining three models and the test data
+#in general, the results are close to test. Specially the neural network model
+autoplot(window(new_deaths, start=c(60,1))) +
+  autolayer(snaive(new_deaths_train, drift=FALSE, h=14), series="Naive Sasonal", PI=FALSE) +
+  autolayer(forecast(sea_arima_model,h=14), series="ARIMA Sasonal", PI=FALSE) +
+  autolayer(forecast(neural_model, h=14), series="Rede Neural", PI=FALSE) +
+  autolayer(new_deaths_test, color="green") +
+  xlab("Semana") + ylab("Óbitos por Covid-19") +
+  ggtitle("Previsão de óbitos por Covid-19") +
+  guides(colour=guide_legend(title="Forecast"))
+
+# Compare Accuracy
+#The ARIMA Seasonal model was the best one, but it is not so good
+#https://otexts.com/fpp2/accuracy.html
+accuracy(forecast(sea_arima_model,h=7), new_deaths_test)
+accuracy(forecast(neural_model,h=7), new_deaths_test)
+
+autoplot(window(new_deaths, start=c(60,1))) +
+  autolayer(forecast(sea_arima_model, h=7), series="ARIMA Sazonal", PI=FALSE) +
+  autolayer(new_deaths_test, color="green") +
+  xlab("Semana") + ylab("Óbitos por Covid-19") +
+  ggtitle("Previsão de óbitos por Covid-19") +
+  guides(colour=guide_legend(title="Forecast"))
